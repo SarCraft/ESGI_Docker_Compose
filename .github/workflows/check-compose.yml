@@ -1,0 +1,93 @@
+name: Check TP Compose
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate-exercises:
+    name: Validate Exercises Structure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required files and content
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXERCISES=(
+            "exercice-1-api-single-service"
+            "exercice-2-api-db-config"
+            "exercice-3-fullstack-compose"
+          )
+
+          FAIL=0
+
+          for EX in "${EXERCISES[@]}"; do
+            echo "==> Checking ${EX}"
+
+            if [ ! -d "$EX" ]; then
+              echo "❌ Dossier manquant: $EX"
+              FAIL=1
+              continue
+            fi
+
+            if [ ! -f "$EX/README.md" ]; then
+              echo "❌ README.md manquant dans $EX"
+              FAIL=1
+            fi
+
+            if [ ! -f "$EX/compose.yaml" ]; then
+              echo "❌ compose.yaml manquant dans $EX"
+              FAIL=1
+            fi
+
+            if [ ! -f "$EX/COMMANDS.md" ]; then
+              echo "❌ COMMANDS.md manquant dans $EX"
+              FAIL=1
+            fi
+
+            if [ -f "$EX/README.md" ]; then
+              if ! grep -q "[A-Za-z0-9]" "$EX/README.md"; then
+                echo "❌ README.md vide dans $EX"
+                FAIL=1
+              fi
+
+              if grep -Eq '^```(bash|sh)|\bdocker\b' "$EX/README.md"; then
+                echo "❌ README.md contient des commandes dans $EX (elles doivent etre dans COMMANDS.md)"
+                FAIL=1
+              fi
+            fi
+
+            if [ -f "$EX/compose.yaml" ]; then
+              if ! grep -q "services:" "$EX/compose.yaml"; then
+                echo "❌ compose.yaml ne contient pas de bloc services dans $EX"
+                FAIL=1
+              fi
+            fi
+
+            if [ -f "$EX/COMMANDS.md" ]; then
+              if ! grep -q "[A-Za-z0-9]" "$EX/COMMANDS.md"; then
+                echo "❌ COMMANDS.md vide dans $EX"
+                FAIL=1
+              fi
+
+              if ! grep -Eq '\bdocker compose\b' "$EX/COMMANDS.md"; then
+                echo "❌ COMMANDS.md ne contient aucune commande docker compose dans $EX"
+                FAIL=1
+              fi
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo ""
+            echo "❌ Validation echouee"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ Validation terminee avec succes"
